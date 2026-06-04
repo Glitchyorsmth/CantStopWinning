@@ -13,6 +13,8 @@ A client-side Fabric mod that plays a fullscreen celebration (animated GIF + aud
 
 ![Demo](demo.gif)
 
+![Demo 2](demo2.gif)
+
 ---
 
 ## Features
