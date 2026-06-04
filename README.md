@@ -11,6 +11,8 @@ For the most dedicated SkyBlock gamblers who need the dopamine hit to match the 
 
 A client-side Fabric mod that plays a fullscreen celebration (animated GIF + audio) when configurable chat messages appear. Set your triggers, keep grinding, and let the mod handle the hype.
 
+![Demo](demo.gif)
+
 ---
 
 ## Features
