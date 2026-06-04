@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "cantstopwinning",
+  "version": "1.0.0",
+  "name": "CantStopWinning",
+  "description": "Celebration overlay mod",
+  "authors": ["glitc"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.cantstopwinning.CantStopWinningClient"]
+  },
+  "mixins": ["cantstopwinning.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.18.1",
+    "minecraft": "~1.21.11",
+    "fabric-api": "*",
+    "java": ">=21"
+  }
+}
