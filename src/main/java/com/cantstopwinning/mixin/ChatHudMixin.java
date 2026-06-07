@@ -42,10 +42,12 @@ public class ChatHudMixin {
         // Skip if this looks like a player chat message
         if (PLAYER_CHAT_PATTERN.matcher(stripped).find()) return;
 
-        // Skip Bazaar, Auction House, and trade messages — these are purchases, not drops
+        // Skip Bazaar, Auction House, trade, and sell messages — only drops should trigger
         if (stripped.startsWith("[Bazaar]") || stripped.startsWith("[Auction]")
                 || stripped.startsWith("You purchased") || stripped.startsWith("You bought")
-                || stripped.startsWith("[BIN]")) return;
+                || stripped.startsWith("You sold") || stripped.startsWith("[BIN]")
+                || stripped.startsWith("Sold ") || stripped.startsWith("Listing ")
+                || stripped.startsWith("Claimed ") || stripped.startsWith("Collecting")) return;
 
         List<String> triggers = List.copyOf(CantStopWinningClient.CONFIG.triggerMessages);
         for (String trigger : triggers) {
