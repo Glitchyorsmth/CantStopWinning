@@ -20,6 +20,14 @@ public class ModConfig {
     public double volume = 0.5;  // 0.0 to 1.0
     public List<String> triggerMessages = new ArrayList<>();
 
+    // Corpse detection settings
+    public boolean corpseDetectionEnabled = true;
+    public String corpseMode = "simple"; // "simple" or "percentage"
+    public double corpseThreshold = 50.0; // loss percentage to trigger (for percentage mode)
+    public double umberKeyCost = 1.5;     // millions
+    public double tungstenKeyCost = 5.0;  // millions
+    public double vanguardKeyCost = 30.0; // millions
+
     private static final String DEFAULT_TRIGGER = "Wow! You dug out 1,000,000 coins!";
 
     public static ModConfig load() {
@@ -28,6 +36,8 @@ public class ModConfig {
             Files.createDirectories(ASSETS_DIR);
             extractDefault("celebration.gif");
             extractDefault("celebration.wav");
+            extractDefault("loss.gif");
+            extractDefault("loss.wav");
         } catch (IOException e) {
             CantStopWinningClient.LOGGER.error("Failed to create assets dir", e);
         }
@@ -44,6 +54,16 @@ public class ModConfig {
             if (cfg.triggerMessages == null) cfg.triggerMessages = new ArrayList<>();
             // Clamp volume
             cfg.volume = Math.max(0.0, Math.min(1.0, cfg.volume));
+            // Clamp corpse threshold
+            cfg.corpseThreshold = Math.max(0.0, Math.min(100.0, cfg.corpseThreshold));
+            // Clamp key costs (must be positive)
+            cfg.umberKeyCost = Math.max(0.0, cfg.umberKeyCost);
+            cfg.tungstenKeyCost = Math.max(0.0, cfg.tungstenKeyCost);
+            cfg.vanguardKeyCost = Math.max(0.0, cfg.vanguardKeyCost);
+            // Default mode if invalid
+            if (cfg.corpseMode == null || (!cfg.corpseMode.equals("simple") && !cfg.corpseMode.equals("percentage"))) {
+                cfg.corpseMode = "simple";
+            }
             return cfg;
         } catch (IOException e) {
             return new ModConfig();

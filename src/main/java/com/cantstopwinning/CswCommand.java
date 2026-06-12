@@ -1,7 +1,6 @@
 package com.cantstopwinning;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
@@ -30,19 +29,31 @@ public class CswCommand {
                 send(ctx, "Celebration triggered!");
                 return 1;
             }))
+            .then(literal("testloss").executes(ctx -> {
+                CantStopWinningClient.triggerLoss();
+                send(ctx, "Loss overlay triggered!");
+                return 1;
+            }))
             .then(literal("config").executes(ctx -> {
-                MinecraftClient.getInstance().execute(() ->
-                    MinecraftClient.getInstance().setScreen(new com.cantstopwinning.gui.ConfigScreen(null)));
+                openConfig();
                 return 1;
             }))
             .then(literal("help").executes(ctx -> {
-                send(ctx, "/csw on|off  - toggle mod");
-                send(ctx, "/csw test    - fire celebration");
-                send(ctx, "/csw config  - open config GUI");
-                send(ctx, "/csw help    - this help");
+                send(ctx, "/csw          - open config GUI");
+                send(ctx, "/csw on|off   - toggle mod");
+                send(ctx, "/csw test     - fire celebration");
+                send(ctx, "/csw testloss - fire loss overlay");
+                send(ctx, "/csw config   - open config GUI");
+                send(ctx, "/csw help     - this help");
                 return 1;
             }))
         );
+    }
+
+    public static void openConfig() {
+        MinecraftClient.getInstance().execute(() ->
+            MinecraftClient.getInstance().setScreen(
+                new com.cantstopwinning.gui.ConfigScreen(null)));
     }
 
     private static void send(CommandContext<FabricClientCommandSource> ctx, String msg) {

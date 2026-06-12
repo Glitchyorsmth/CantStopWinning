@@ -20,6 +20,9 @@ public class CelebrationOverlay implements HudRenderCallback {
 
     private static final int MAX_LOOPS = 2;
 
+    private final String gifName;
+    private final String idPrefix;
+
     private List<GifDecoder.Frame> frames;
     private int currentFrame = 0;
     private long lastFrameTime = 0;
@@ -30,6 +33,11 @@ public class CelebrationOverlay implements HudRenderCallback {
     private Identifier[] frameTextures;
     private int[] frameWidths;
     private int[] frameHeights;
+
+    public CelebrationOverlay(String gifName, String idPrefix) {
+        this.gifName = gifName;
+        this.idPrefix = idPrefix;
+    }
 
     public void start() {
         if (active) return;
@@ -54,9 +62,9 @@ public class CelebrationOverlay implements HudRenderCallback {
     private void loadGifIfNeeded() {
         if (loaded) return;
         loaded = true;
-        try (InputStream in = openAsset("celebration.gif")) {
+        try (InputStream in = openAsset(gifName)) {
             if (in == null) {
-                CantStopWinningClient.LOGGER.warn("celebration.gif not found");
+                CantStopWinningClient.LOGGER.warn("{} not found", gifName);
                 return;
             }
             frames = GifDecoder.decode(in);
@@ -67,15 +75,15 @@ public class CelebrationOverlay implements HudRenderCallback {
             frameHeights = new int[frames.size()];
 
             for (int i = 0; i < frames.size(); i++) {
-                frameTextures[i] = Identifier.of("cantstopwinning", "gif_frame_" + i);
+                frameTextures[i] = Identifier.of("cantstopwinning", idPrefix + "_" + i);
                 BufferedImage img = frames.get(i).image();
                 frameWidths[i] = img.getWidth();
                 frameHeights[i] = img.getHeight();
                 registerFrameTexture(i, img);
             }
-            CantStopWinningClient.LOGGER.info("Loaded celebration.gif: {} frames", frames.size());
+            CantStopWinningClient.LOGGER.info("Loaded {}: {} frames", gifName, frames.size());
         } catch (IOException e) {
-            CantStopWinningClient.LOGGER.error("Failed to load celebration.gif", e);
+            CantStopWinningClient.LOGGER.error("Failed to load {}", gifName, e);
         }
     }
 
@@ -100,7 +108,7 @@ public class CelebrationOverlay implements HudRenderCallback {
             }
         }
         NativeImageBackedTexture tex = new NativeImageBackedTexture(
-                () -> "cantstopwinning:gif_frame_" + index, ni);
+                () -> "cantstopwinning:" + idPrefix + "_" + index, ni);
         client.getTextureManager().registerTexture(frameTextures[index], tex);
     }
 
