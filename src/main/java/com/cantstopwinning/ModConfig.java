@@ -37,6 +37,7 @@ public class ModConfig {
             Files.createDirectories(ASSETS_DIR);
             extractDefault("celebration.gif");
             extractDefault("celebration.wav");
+            extractDefault("loss.png");
             extractDefault("loss.gif");
             extractDefault("loss.wav");
         } catch (IOException e) {

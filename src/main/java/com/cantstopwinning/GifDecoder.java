@@ -4,6 +4,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
+import java.awt.image.IndexColorModel;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -26,7 +27,8 @@ public class GifDecoder {
 
         int count = reader.getNumImages(true);
         for (int i = 0; i < count; i++) {
-            BufferedImage img = reader.read(i);
+            BufferedImage raw = reader.read(i);
+            BufferedImage img = toArgb(raw);
             int delayMs = 100;
             try {
                 javax.imageio.metadata.IIOMetadata meta = reader.getImageMetadata(i);
@@ -38,6 +40,28 @@ public class GifDecoder {
         }
         reader.dispose();
         return frames;
+    }
+
+    private static BufferedImage toArgb(BufferedImage src) {
+        int w = src.getWidth(), h = src.getHeight();
+        BufferedImage dst = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+
+        if (src.getColorModel() instanceof IndexColorModel icm) {
+            int transIdx = icm.getTransparentPixel();
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    int pixel = src.getRaster().getSample(x, y, 0);
+                    if (pixel == transIdx) {
+                        dst.setRGB(x, y, 0x00000000);
+                    } else {
+                        dst.setRGB(x, y, icm.getRGB(pixel));
+                    }
+                }
+            }
+        } else {
+            dst.getGraphics().drawImage(src, 0, 0, null);
+        }
+        return dst;
     }
 
     private static int extractDelay(org.w3c.dom.Node root) {
