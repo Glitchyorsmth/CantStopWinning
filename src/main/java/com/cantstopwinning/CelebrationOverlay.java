@@ -29,6 +29,7 @@ public class CelebrationOverlay implements HudRenderCallback {
     private volatile boolean active = false;
     private boolean loaded = false;
     private int loopCount = 0;
+    private double lastOpacity = -1;
 
     private Identifier[] frameTextures;
     private int[] frameWidths;
@@ -43,6 +44,7 @@ public class CelebrationOverlay implements HudRenderCallback {
         if (active) return;
         MinecraftClient.getInstance().execute(() -> {
             loadGifIfNeeded();
+            rebuildTexturesIfOpacityChanged();
             if (frames == null || frames.isEmpty()) return;
             currentFrame = 0;
             loopCount = 0;
@@ -81,15 +83,23 @@ public class CelebrationOverlay implements HudRenderCallback {
                 frameHeights[i] = img.getHeight();
                 registerFrameTexture(i, img);
             }
+            lastOpacity = CantStopWinningClient.CONFIG.overlayOpacity;
             CantStopWinningClient.LOGGER.info("Loaded {}: {} frames", gifName, frames.size());
         } catch (IOException e) {
             CantStopWinningClient.LOGGER.error("Failed to load {}", gifName, e);
         }
     }
 
-    /**
-     * Opens an asset from the config folder first, falls back to JAR resources.
-     */
+    private void rebuildTexturesIfOpacityChanged() {
+        if (frames == null || frames.isEmpty()) return;
+        double currentOpacity = CantStopWinningClient.CONFIG.overlayOpacity;
+        if (Math.abs(currentOpacity - lastOpacity) < 0.01) return;
+        lastOpacity = currentOpacity;
+        for (int i = 0; i < frames.size(); i++) {
+            registerFrameTexture(i, frames.get(i).image());
+        }
+    }
+
     private static InputStream openAsset(String filename) throws IOException {
         Path external = ModConfig.ASSETS_DIR.resolve(filename);
         if (Files.exists(external)) {
@@ -101,10 +111,13 @@ public class CelebrationOverlay implements HudRenderCallback {
     private void registerFrameTexture(int index, BufferedImage img) {
         MinecraftClient client = MinecraftClient.getInstance();
         int w = img.getWidth(), h = img.getHeight();
+        float opacity = (float) CantStopWinningClient.CONFIG.overlayOpacity;
         NativeImage ni = new NativeImage(NativeImage.Format.RGBA, w, h, false);
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
-                ni.setColorArgb(x, y, img.getRGB(x, y));
+                int argb = img.getRGB(x, y);
+                int a = (int)(((argb >>> 24) & 0xFF) * opacity) & 0xFF;
+                ni.setColorArgb(x, y, (a << 24) | (argb & 0x00FFFFFF));
             }
         }
         NativeImageBackedTexture tex = new NativeImageBackedTexture(
@@ -121,9 +134,9 @@ public class CelebrationOverlay implements HudRenderCallback {
         if (now - lastFrameTime >= frame.delayMs()) {
             int nextFrame = currentFrame + 1;
             if (nextFrame >= frames.size()) {
-                // Completed one full loop
                 loopCount++;
-                if (loopCount >= MAX_LOOPS) {
+                // Single-frame overlays stay until stop() is called (by audio callback)
+                if (frames.size() > 1 && loopCount >= MAX_LOOPS) {
                     active = false;
                     return;
                 }

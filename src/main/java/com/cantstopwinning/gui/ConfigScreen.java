@@ -74,7 +74,7 @@ public class ConfigScreen extends Screen {
     private void initTriggersTab() {
         // --- Volume slider ---
         double vol = CantStopWinningClient.CONFIG.volume;
-        addDrawableChild(new SliderWidget(width / 2 - 150, 55, 300, 20,
+        addDrawableChild(new SliderWidget(width / 2 - 150, 55, 145, 20,
                 Text.literal("Volume: " + (int)(vol * 100) + "%"), vol) {
             @Override
             protected void updateMessage() {
@@ -83,6 +83,21 @@ public class ConfigScreen extends Screen {
             @Override
             protected void applyValue() {
                 CantStopWinningClient.CONFIG.volume = value;
+                CantStopWinningClient.CONFIG.save();
+            }
+        });
+
+        // --- Opacity slider ---
+        double opa = CantStopWinningClient.CONFIG.overlayOpacity;
+        addDrawableChild(new SliderWidget(width / 2 + 5, 55, 145, 20,
+                Text.literal("Opacity: " + (int)(opa * 100) + "%"), opa) {
+            @Override
+            protected void updateMessage() {
+                setMessage(Text.literal("Opacity: " + (int)(value * 100) + "%"));
+            }
+            @Override
+            protected void applyValue() {
+                CantStopWinningClient.CONFIG.overlayOpacity = value;
                 CantStopWinningClient.CONFIG.save();
             }
         });

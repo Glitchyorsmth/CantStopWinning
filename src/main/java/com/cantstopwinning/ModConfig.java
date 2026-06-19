@@ -18,6 +18,7 @@ public class ModConfig {
 
     public boolean enabled = true;
     public double volume = 0.5;  // 0.0 to 1.0
+    public double overlayOpacity = 1.0; // 0.0 to 1.0
     public List<String> triggerMessages = new ArrayList<>();
 
     // Corpse detection settings
@@ -54,6 +55,7 @@ public class ModConfig {
             if (cfg.triggerMessages == null) cfg.triggerMessages = new ArrayList<>();
             // Clamp volume
             cfg.volume = Math.max(0.0, Math.min(1.0, cfg.volume));
+            cfg.overlayOpacity = Math.max(0.0, Math.min(1.0, cfg.overlayOpacity));
             // Clamp corpse threshold
             cfg.corpseThreshold = Math.max(0.0, Math.min(100.0, cfg.corpseThreshold));
             // Clamp key costs (must be positive)
