@@ -19,65 +19,59 @@ public final class CswCommands {
     private CswCommands() {
     }
 
+    private static LiteralArgumentBuilder<FabricClientCommandSource> lit(String name) {
+        return LiteralArgumentBuilder.literal(name);
+    }
+
     public static void register() {
-        LiteralArgumentBuilder<FabricClientCommandSource> root =
-                LiteralArgumentBuilder.<FabricClientCommandSource>literal("csw")
-                        // Bare /csw opens the settings screen.
+        LiteralArgumentBuilder<FabricClientCommandSource> root = lit("csw")
+                .executes(ctx -> {
+                    openConfig(); // bare /csw opens the settings screen
+                    return 1;
+                })
+                .then(lit("config").executes(ctx -> {
+                    openConfig();
+                    return 1;
+                }))
+                .then(lit("on").executes(ctx -> {
+                    setEnabled(true);
+                    ctx.getSource().sendFeedback(Texts.literal("CantStopWinning enabled."));
+                    return 1;
+                }))
+                .then(lit("off").executes(ctx -> {
+                    setEnabled(false);
+                    ctx.getSource().sendFeedback(Texts.literal("CantStopWinning disabled."));
+                    return 1;
+                }))
+                .then(lit("test").executes(ctx -> {
+                    Celebrations.win();
+                    ctx.getSource().sendFeedback(Texts.literal("Celebration triggered!"));
+                    return 1;
+                }))
+                .then(lit("testloss").executes(ctx -> {
+                    Celebrations.loss();
+                    ctx.getSource().sendFeedback(Texts.literal("Loss overlay triggered!"));
+                    return 1;
+                }))
+                .then(lit("sim").then(RequiredArgumentBuilder.<FabricClientCommandSource, String>argument(
+                                "message", StringArgumentType.greedyString())
                         .executes(ctx -> {
-                            openConfig();
+                            String msg = StringArgumentType.getString(ctx, "message");
+                            ctx.getSource().sendFeedback(Texts.literal("Simulating: " + msg));
+                            CswChat.onChat(Texts.literal(msg)); // run the real detector on fake text
                             return 1;
-                        })
-                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("config")
-                                .executes(ctx -> {
-                                    openConfig();
-                                    return 1;
-                                }))
-                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("on")
-                                .executes(ctx -> {
-                                    setEnabled(true);
-                                    ctx.getSource().sendFeedback(Texts.literal("CantStopWinning enabled."));
-                                    return 1;
-                                }))
-                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("off")
-                                .executes(ctx -> {
-                                    setEnabled(false);
-                                    ctx.getSource().sendFeedback(Texts.literal("CantStopWinning disabled."));
-                                    return 1;
-                                }))
-                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("test")
-                                .executes(ctx -> {
-                                    Celebrations.win();
-                                    ctx.getSource().sendFeedback(Texts.literal("Celebration triggered!"));
-                                    return 1;
-                                }))
-                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("testloss")
-                                .executes(ctx -> {
-                                    Celebrations.loss();
-                                    ctx.getSource().sendFeedback(Texts.literal("Loss overlay triggered!"));
-                                    return 1;
-                                }))
-                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("sim")
-                                .then(RequiredArgumentBuilder.<FabricClientCommandSource, String>argument(
-                                                "message", StringArgumentType.greedyString())
-                                        .executes(ctx -> {
-                                            String msg = StringArgumentType.getString(ctx, "message");
-                                            ctx.getSource().sendFeedback(Texts.literal("Simulating: " + msg));
-                                            // Run the real detection pipeline against fake chat text.
-                                            CswChat.onChat(Texts.literal(msg));
-                                            return 1;
-                                        })))
-                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("help")
-                                .executes(ctx -> {
-                                    var src = ctx.getSource();
-                                    src.sendFeedback(Texts.literal("/csw          - open settings"));
-                                    src.sendFeedback(Texts.literal("/csw on|off   - toggle mod"));
-                                    src.sendFeedback(Texts.literal("/csw test     - fire celebration"));
-                                    src.sendFeedback(Texts.literal("/csw testloss - fire loss overlay"));
-                                    src.sendFeedback(Texts.literal("/csw sim <msg>- test chat detection"));
-                                    src.sendFeedback(Texts.literal("/csw config   - open settings"));
-                                    src.sendFeedback(Texts.literal("/csw help     - this help"));
-                                    return 1;
-                                }));
+                        })))
+                .then(lit("help").executes(ctx -> {
+                    var src = ctx.getSource();
+                    src.sendFeedback(Texts.literal("/csw          - open settings"));
+                    src.sendFeedback(Texts.literal("/csw on|off   - toggle mod"));
+                    src.sendFeedback(Texts.literal("/csw test     - fire celebration"));
+                    src.sendFeedback(Texts.literal("/csw testloss - fire loss overlay"));
+                    src.sendFeedback(Texts.literal("/csw sim <msg>- test chat detection"));
+                    src.sendFeedback(Texts.literal("/csw config   - open settings"));
+                    src.sendFeedback(Texts.literal("/csw help     - this help"));
+                    return 1;
+                }));
 
         Framework.commands().registerRaw(root);
     }
