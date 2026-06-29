@@ -1,7 +1,7 @@
 # CantStopWinning
 
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11-green?logo=mojangstudios)](https://www.minecraft.net/)
-[![Fabric](https://img.shields.io/badge/Fabric_Loader-0.18.1-blue)](https://fabricmc.net/)
+[![Fabric](https://img.shields.io/badge/Fabric_Loader-0.18+-blue)](https://fabricmc.net/)
 [![License](https://img.shields.io/github/license/Glitchyorsmth/CantStopWinning)](LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/Glitchyorsmth/CantStopWinning?include_prereleases)](https://github.com/Glitchyorsmth/CantStopWinning/releases)
 
@@ -19,21 +19,26 @@ A client-side Fabric mod that plays a fullscreen celebration (animated GIF + aud
 
 ## Features
 
-### Celebration Overlay
-- Fullscreen animated GIF overlay rendered on the HUD
-- Audio clip synced with the overlay
+### Celebration & Loss Overlays
+- Fullscreen image/GIF overlay on the HUD with synced audio
+- Separate **win** and **loss** overlays — swap in your own (PNG / JPG / GIF + WAV)
+- Volume and opacity controls
 
-### Chat Trigger System
-- Configurable trigger messages — add as many as you want
-- **Server-only filtering** — automatically ignores player chat so someone typing your trigger phrase won't set it off
-- Works with Hypixel SkyBlock system messages, rank formats, and color codes
-- Pre-loaded with `Wow! You dug out 1,000,000 coins!` by default
+### Trigger Presets
+- Named, switchable sets of triggers (e.g. *Diana*, *Fishing*) — only the active preset fires
+- Create, rename, delete presets from a dropdown
+- Each trigger is its own editable box; paginated 6 per page
+- **Smart filtering** ignores player chat and economy spam (auction/bazaar/BIN/RNG meter) so only real drops trigger
 
-### Config GUI
-- Clean in-game screen with bordered trigger list
-- Add / remove triggers with one click
-- Volume slider (0–100%)
-- Paginated list — 12 triggers per page with `<` / `>` navigation
+### Corpse-Loss Detection (Glacite Tunnels)
+- Reads SkyHanni corpse-profit messages to fire a loss overlay when you take an L
+- **Set amount** mode (fires when the loss ≥ a coins amount you pick) or **Percentage** mode (loss exceeds a % of the key cost)
+- Auto-fills Umber / Tungsten / Skeleton key prices from Bazaar buys and item tooltips (also editable by hand)
+
+### Settings Screen
+- Dark, scalable in-game GUI with four tabs: **General · Triggers · Corpse · Testing**
+- Tooltips on every control
+- **Testing tab** — one-click buttons fire the overlays or simulate a chat line through the detector
 
 ---
 
@@ -41,36 +46,47 @@ A client-side Fabric mod that plays a fullscreen celebration (animated GIF + aud
 
 | Command | Description |
 |---|---|
-| `/csw config` | Open the config GUI |
-| `/csw test` | Fire the celebration immediately |
-| `/csw on` | Enable the mod |
-| `/csw off` | Disable the mod |
+| `/csw` or `/csw config` | Open the settings screen |
+| `/csw on` / `/csw off` | Enable / disable the mod |
+| `/csw test` / `/csw testloss` | Fire the win / loss overlay |
+| `/csw sim <message>` | Run any text through the trigger/corpse/filter detector |
 | `/csw help` | List all commands |
 
-All commands are **client-side** with tab-completion.
+All commands are **client-side**.
 
 ---
 
 ## Installation
 
-1. Download `cantstopwinning-1.0.0.jar` from [Releases](https://github.com/Glitchyorsmth/CantStopWinning/releases)
-2. Drop it into your `.minecraft/mods/` folder
+1. Download the latest `cantstopwinning-1.21.11-x.y.z.jar` from [Releases](https://github.com/Glitchyorsmth/CantStopWinning/releases)
+2. Drop it into your `mods/` folder
 3. Launch the game — the default trigger is ready to go
+
+Requires **Fabric Loader 0.18+** and **Fabric API** for Minecraft **1.21.11**. The mod's framework
+(Anvil) is bundled inside the jar — no separate download.
 
 ---
 
 ## Customization
 
-Want your own celebration? Just swap the files in your config folder — no rebuilding needed:
+Swap the overlay files in your config folder — no rebuilding needed:
 
 ```
-.minecraft/config/cantstopwinning/
-├── cantstopwinning.json    ← config (edited in-game via /csw config)
-├── celebration.gif         ← your animated GIF (transparent backgrounds work)
-└── celebration.wav         ← your audio clip (WAV, PCM 16-bit)
+config/
+├── cantstopwinning.json          ← settings (edited in-game)
+└── cantstopwinning/
+    ├── celebration.gif / .wav    ← win overlay (PNG/JPG/GIF + WAV)
+    └── loss.gif / .png / .wav    ← loss overlay
 ```
 
-The defaults are extracted there automatically on first launch. Replace `celebration.gif` or `celebration.wav` with your own and restart the game.
+Defaults are extracted on first launch. Replace any file with your own (PNG > JPG > JPEG > GIF load priority) and restart.
+
+---
+
+## Built on Anvil
+
+CantStopWinning runs on **Anvil**, a multi-version client-side Fabric framework. Same mappings build
+targets current and future Minecraft, so the mod is ready to follow SkyBlock forward.
 
 ---
 
