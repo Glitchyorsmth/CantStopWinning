@@ -7,7 +7,8 @@ plugins {
 }
 
 // DO NOT set group = ...!  (loom-back-compat manages it.)
-version = "${property("mod.version")}+${sc.current.version}"
+// Jar name: <id>-<mc>-<modversion>.jar  e.g. cantstopwinning-1.21.11-1.2.0.jar
+version = "${sc.current.version}-${property("mod.version")}"
 base.archivesName = property("mod.id") as String
 
 // Java level required by the active Minecraft version (26.1+ → 25, 1.20.5+ → 21).
