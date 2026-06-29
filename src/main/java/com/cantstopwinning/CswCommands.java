@@ -1,0 +1,107 @@
+package com.cantstopwinning;
+
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
+import dev.anvil.api.Framework;
+import dev.anvil.api.util.Texts;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+
+/**
+ * The {@code /csw} command tree, registered through Anvil. Built directly with Brigadier (Anvil's
+ * recommended approach — version-stable across 1.21.11 / 26.1) and handed to
+ * {@code Framework.commands().registerRaw}, which re-registers it on every world join.
+ */
+public final class CswCommands {
+
+    private CswCommands() {
+    }
+
+    public static void register() {
+        LiteralArgumentBuilder<FabricClientCommandSource> root =
+                LiteralArgumentBuilder.<FabricClientCommandSource>literal("csw")
+                        // Bare /csw opens the settings screen.
+                        .executes(ctx -> {
+                            openConfig();
+                            return 1;
+                        })
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("config")
+                                .executes(ctx -> {
+                                    openConfig();
+                                    return 1;
+                                }))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("on")
+                                .executes(ctx -> {
+                                    setEnabled(true);
+                                    ctx.getSource().sendFeedback(Texts.literal("CantStopWinning enabled."));
+                                    return 1;
+                                }))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("off")
+                                .executes(ctx -> {
+                                    setEnabled(false);
+                                    ctx.getSource().sendFeedback(Texts.literal("CantStopWinning disabled."));
+                                    return 1;
+                                }))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("test")
+                                .executes(ctx -> {
+                                    Celebrations.win();
+                                    ctx.getSource().sendFeedback(Texts.literal("Celebration triggered!"));
+                                    return 1;
+                                }))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("testloss")
+                                .executes(ctx -> {
+                                    Celebrations.loss();
+                                    ctx.getSource().sendFeedback(Texts.literal("Loss overlay triggered!"));
+                                    return 1;
+                                }))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("sim")
+                                .then(RequiredArgumentBuilder.<FabricClientCommandSource, String>argument(
+                                                "message", StringArgumentType.greedyString())
+                                        .executes(ctx -> {
+                                            String msg = StringArgumentType.getString(ctx, "message");
+                                            ctx.getSource().sendFeedback(Texts.literal("Simulating: " + msg));
+                                            // Run the real detection pipeline against fake chat text.
+                                            CswChat.onChat(Texts.literal(msg));
+                                            return 1;
+                                        })))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("help")
+                                .executes(ctx -> {
+                                    var src = ctx.getSource();
+                                    src.sendFeedback(Texts.literal("/csw          - open settings"));
+                                    src.sendFeedback(Texts.literal("/csw on|off   - toggle mod"));
+                                    src.sendFeedback(Texts.literal("/csw test     - fire celebration"));
+                                    src.sendFeedback(Texts.literal("/csw testloss - fire loss overlay"));
+                                    src.sendFeedback(Texts.literal("/csw sim <msg>- test chat detection"));
+                                    src.sendFeedback(Texts.literal("/csw config   - open settings"));
+                                    src.sendFeedback(Texts.literal("/csw help     - this help"));
+                                    return 1;
+                                }));
+
+        Framework.commands().registerRaw(root);
+    }
+
+    private static void setEnabled(boolean on) {
+        CantStopWinningClient.CONFIG.get().enabled = on;
+        CantStopWinningClient.CONFIG.save();
+    }
+
+    private static void openConfig() {
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> mc.setScreen(buildScreen()));
+    }
+
+    /**
+     * The custom screen uses {@code GuiGraphics} (1.21.11 only); 26.x falls back to Anvil's
+     * generated screen. The build excludes {@code CswConfigScreen} on 26.x.
+     */
+    private static Screen buildScreen() {
+        //? if <26.1 {
+        return new CswConfigScreen(CantStopWinningClient.CONFIG);
+        //?}
+        //? if >=26.1 {
+        /*return Framework.gui().configScreen(CantStopWinningClient.CONFIG);*/
+        //?}
+    }
+}

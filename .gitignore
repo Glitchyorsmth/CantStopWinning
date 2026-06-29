@@ -32,3 +32,6 @@ logs/
 *.bak
 *.tmp
 local.properties
+
+# Stonecutter generated
+versions/
