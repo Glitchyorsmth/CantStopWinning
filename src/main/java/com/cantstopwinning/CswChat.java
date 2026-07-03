@@ -28,9 +28,17 @@ public final class CswChat {
     // [SkyHanni] Profit for Vanguard Corpse: -20.9M
     private static final Pattern CORPSE_PROFIT =
             Pattern.compile("\\[SkyHanni\\] Profit for (\\w+) Corpse: ([+-]?[\\d,.]+)([KMBkmb]?)");
+    // Fixed Hypixel string, no variable parts — plain literal match, no regex needed.
+    private static final String KEY_SAVED_MESSAGE =
+            "LUCKY! Your Resourceful perk saved your key from being consumed!";
     // [Bazaar] Bought 1x Skeleton Key for 31.7M coins!
     private static final Pattern KEY_PURCHASE =
             Pattern.compile("\\[Bazaar\\] Bought \\d+x (Skeleton Key|Umber Key|Tungsten Key) for ([\\d,.]+)([KMBkmb]?) coins");
+
+    // Set when KEY_SAVED_MESSAGE arrives, consumed by the next CORPSE_PROFIT line.
+    // ponytail: assumes the two lines are adjacent (no other corpse opened between them) — confirmed
+    // by the user as how Hypixel actually sends them. Add a staleness guard if that ever proves wrong.
+    private static boolean keySaved;
 
     private CswChat() {
     }
@@ -45,8 +53,25 @@ public final class CswChat {
 
         // Corpse-loss detection (SkyHanni).
         if (cfg.corpseDetectionEnabled) {
+            if (stripped.equals(KEY_SAVED_MESSAGE)) {
+                if (cfg.keySavedMode != KeySavedMode.OFF) {
+                    keySaved = true;
+                }
+                return;
+            }
             Matcher m = CORPSE_PROFIT.matcher(stripped);
             if (m.find()) {
+                boolean saved = keySaved;
+                keySaved = false;
+                if (saved) {
+                    // Key wasn't spent — zero coins paid, so this can never be a real loss,
+                    // regardless of what SkyHanni's profit line (which doesn't know about the
+                    // save) reports.
+                    if (cfg.keySavedMode == KeySavedMode.CELEBRATE) {
+                        Celebrations.win();
+                    }
+                    return;
+                }
                 double profit = parseAmount(m.group(2), m.group(3));
                 if (shouldTriggerLoss(cfg, m.group(1), profit)) {
                     Celebrations.loss();
@@ -81,8 +106,8 @@ public final class CswChat {
             }
         }
 
-        // Active preset's triggers.
-        for (String trigger : List.copyOf(cfg.activeTriggers())) {
+        // Active preset's triggers, plus any included presets' triggers.
+        for (String trigger : List.copyOf(cfg.effectiveTriggers())) {
             if (!trigger.isEmpty() && stripped.contains(trigger)) {
                 Celebrations.win();
                 break;

@@ -11,7 +11,7 @@ import net.minecraft.client.gui.screens.Screen;
 
 /**
  * The {@code /csw} command tree, registered through Anvil. Built directly with Brigadier (Anvil's
- * recommended approach — version-stable across 1.21.11 / 26.1) and handed to
+ * recommended approach — version-stable across 1.21.11 / 26.2) and handed to
  * {@code Framework.commands().registerRaw}, which re-registers it on every world join.
  */
 public final class CswCommands {
@@ -61,6 +61,15 @@ public final class CswCommands {
                             CswChat.onChat(Texts.literal(msg)); // run the real detector on fake text
                             return 1;
                         })))
+                // Hidden — only ever reached via the clickable [Yes] link a composite Import posts
+                // to chat on a name collision, never meant to be typed by hand.
+                .then(lit("confirmimport").then(RequiredArgumentBuilder.<FabricClientCommandSource, String>argument(
+                                "name", StringArgumentType.greedyString())
+                        .executes(ctx -> {
+                            // PendingPresetImports.confirm posts its own chat outcome either way.
+                            PendingPresetImports.confirm(StringArgumentType.getString(ctx, "name"));
+                            return 1;
+                        })))
                 .then(lit("help").executes(ctx -> {
                     var src = ctx.getSource();
                     src.sendFeedback(Texts.literal("/csw          - open settings"));
@@ -83,7 +92,13 @@ public final class CswCommands {
 
     private static void openConfig() {
         Minecraft mc = Minecraft.getInstance();
+        // Renamed across the boundary: setScreen (1.21.11) → setScreenAndShow (26.2).
+        //? if <26.2 {
         mc.execute(() -> mc.setScreen(buildScreen()));
+        //?}
+        //? if >=26.2 {
+        /*mc.execute(() -> mc.setScreenAndShow(buildScreen()));*/
+        //?}
     }
 
     /**
@@ -91,10 +106,10 @@ public final class CswCommands {
      * generated screen. The build excludes {@code CswConfigScreen} on 26.x.
      */
     private static Screen buildScreen() {
-        //? if <26.1 {
+        //? if <26.2 {
         return new CswConfigScreen(CantStopWinningClient.CONFIG);
         //?}
-        //? if >=26.1 {
+        //? if >=26.2 {
         /*return Framework.gui().configScreen(CantStopWinningClient.CONFIG);*/
         //?}
     }

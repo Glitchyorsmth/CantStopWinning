@@ -35,3 +35,6 @@ local.properties
 
 # Stonecutter generated
 versions/
+
+# Local AI context (do not publish)
+CLAUDE.md

@@ -83,13 +83,6 @@ Defaults are extracted on first launch. Replace any file with your own (PNG > JP
 
 ---
 
-## Built on Anvil
-
-CantStopWinning runs on **Anvil**, a multi-version client-side Fabric framework. Same mappings build
-targets current and future Minecraft, so the mod is ready to follow SkyBlock forward.
-
----
-
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

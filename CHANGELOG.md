@@ -2,6 +2,35 @@
 
 All notable changes to CantStopWinning.
 
+## [1.3.0] — 2026-07-04
+
+### Added
+- **Preset composition** — a preset can include other presets by live reference (e.g. "General"
+  includes "Slayer" and "Diana"): it fires on their triggers too, and editing an included preset
+  updates everywhere it's included immediately, no copying or desync. Only presets with no
+  includes of their own are eligible to be included. Manage it from the new **Includes** button on
+  the Triggers tab.
+- **Preset import/export** — copy a preset (its own triggers, plus everything it includes) to the
+  clipboard as a shareable code from the Triggers tab, and paste one back in with Import. Importing
+  a composite preset recreates its named sub-presets locally too, not just a flat trigger dump.
+- **Import overwrite protection** — if importing would overwrite an existing preset with different
+  content, you can either get a warning after it happens or a click-to-confirm prompt in chat
+  before it happens (5 seconds to respond). Pick your preference on the General tab.
+- **Key-saved corpse detection** — when Hypixel's Resourceful perk saves your key from being
+  consumed, that corpse no longer counts as a loss (the key wasn't spent, so nothing was lost),
+  with an option to also fire the celebration overlay instead. New "Key saved" control on the
+  Corpse tab.
+
+### Changed
+- **"New" preset is easier to use** — it now always creates a genuinely fresh preset and puts its
+  name in the box ready to rename, instead of silently doing nothing if the box still showed the
+  previously-selected preset's name.
+- **Text fields now behave normally** — clicking places the cursor where you clicked, and
+  click-dragging selects text. Previously clicking only focused the field without moving the
+  cursor, so editing meant arrowing over one character at a time.
+- Every tooltip in the settings screen was shortened and simplified.
+- Internal: retargeted the 26.x build from 26.1 to 26.2 (Mojang skipped 26.1) — no user-facing effect.
+
 ## [1.2.0] — 2026-06-29
 
 Full rebuild on the **Anvil** framework, with a redesigned settings screen and trigger presets.

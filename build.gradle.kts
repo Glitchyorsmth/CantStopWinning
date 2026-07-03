@@ -11,20 +11,11 @@ plugins {
 version = "${sc.current.version}-${property("mod.version")}"
 base.archivesName = property("mod.id") as String
 
-// Java level required by the active Minecraft version (26.1+ → 25, 1.20.5+ → 21).
+// Java level required by the active Minecraft version (26.2+ → 25, 1.20.5+ → 21).
 val requiredJava: JavaVersion = when {
-    sc.current.parsed >= "26.1" -> JavaVersion.VERSION_25
+    sc.current.parsed >= "26.2" -> JavaVersion.VERSION_25
     sc.current.parsed >= "1.20.5" -> JavaVersion.VERSION_21
     else -> JavaVersion.VERSION_17
-}
-
-repositories {
-    fun strictMaven(url: String, alias: String, vararg groups: String) = exclusiveContent {
-        forRepository { maven(url) { name = alias } }
-        filter { groups.forEach(::includeGroup) }
-    }
-    strictMaven("https://www.cursemaven.com", "CurseForge", "curse.maven")
-    strictMaven("https://api.modrinth.com/maven", "Modrinth", "maven.modrinth")
 }
 
 dependencies {
@@ -49,6 +40,11 @@ dependencies {
     // CSW needs FabricClientCommandSource for the /csw Brigadier tree (Anvil's registerRaw escape
     // hatch), and ItemTooltipCallback for reading Bazaar prices off item tooltips.
     fapi("fabric-command-api-v2", "fabric-item-api-v1")
+    // Touching mc.player (LocalPlayer) on 26.x needs these on the compile classpath — Fabric
+    // injects interfaces from both modules into LocalPlayer/Entity (PacketContextProvider,
+    // EntityLoadData), and 26.x's stricter compile checking chokes without them present even
+    // though we never call into them directly. Referenced from PendingPresetImports (both versions).
+    fapi("fabric-networking-api-v1", "fabric-lifecycle-events-v1")
 }
 
 loom {
@@ -58,12 +54,10 @@ loom {
         preferGradleTask = true
         generateRunConfig = true
         runDirectory = rootProject.file("run")
-        jvmArguments.add("-Dmixin.debug.export=true")
     }
 }
 
 java {
-    withSourcesJar()
     targetCompatibility = requiredJava
     sourceCompatibility = requiredJava
 
@@ -75,7 +69,7 @@ java {
 
 // CswConfigScreen uses GuiGraphics, which 26.x removed. Compile it only on 1.21.11; on 26.x the
 // /csw command falls back to Anvil's generated screen (see CswCommands.buildScreen toggle).
-if (sc.current.parsed >= "26.1") {
+if (sc.current.parsed >= "26.2") {
     sourceSets.named("main") {
         java { exclude("**/CswConfigScreen.java") }
     }

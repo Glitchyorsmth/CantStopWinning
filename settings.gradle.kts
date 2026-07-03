@@ -19,7 +19,7 @@ plugins {
 
 stonecutter {
     create(rootProject) {
-        versions("1.21.11", "26.1")
+        versions("1.21.11", "26.2") // skipped 26.1 → 26.2, mirrors Anvil
         // Current SkyBlock runs on 1.21.11, so that's the working baseline.
         vcsVersion = "1.21.11"
     }

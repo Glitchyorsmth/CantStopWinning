@@ -1,11 +1,16 @@
 package com.cantstopwinning;
 
+import dev.anvil.api.Framework;
 import dev.anvil.api.config.ConfigHandle;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -52,7 +57,7 @@ public final class CswConfigScreen extends Screen {
 
     /** Fixed logical panel size; the panel is scaled to fit the window and centered. */
     private static final int DESIGN_W = 380;
-    private static final int DESIGN_H = 300;
+    private static final int DESIGN_H = 340;
     /** Fraction of the window the panel is allowed to fill, and a cap so it stays readable. */
     private static final float FIT_MARGIN = 0.92f;
     private static final float MAX_SCALE = 3.0f;
@@ -91,6 +96,14 @@ public final class CswConfigScreen extends Screen {
     // Preset dropdown state + geometry (layout space).
     private boolean presetDropdownOpen;
     private int ddX, ddY, ddW;
+    // Set by newPreset(); consumed once by the next init() to focus + select-all the name box, so
+    // the freshly-created preset is ready to rename immediately (no manual clear-then-type).
+    private boolean focusNewPresetField;
+
+    // Includes-management overlay state + geometry (layout space) — multi-toggle, stays open
+    // until you click the chip again or click elsewhere (unlike the single-pick preset dropdown).
+    private boolean includesDropdownOpen;
+    private int idX, idY, idW;
 
     private record Zone(int x1, int y1, int x2, int y2, Runnable action) {
         boolean hit(double mx, double my) {
@@ -144,6 +157,13 @@ public final class CswConfigScreen extends Screen {
         if (tab == Tab.TRIGGERS) {
             presetField = makeBox(150, 16, 48);
             presetField.setValue(cfg.activePreset);
+            if (focusNewPresetField) {
+                focusNewPresetField = false;
+                presetField.setCursorPosition(0);
+                presetField.setHighlightPos(cfg.activePreset.length());
+                presetField.setFocused(true);
+                setFocused(presetField);
+            }
             addField = makeBox(innerW - 52, 16, 256);
             addField.setHint(Component.literal("Type a trigger phrase…"));
 
@@ -236,9 +256,12 @@ public final class CswConfigScreen extends Screen {
             box.render(ctx, mvx, mvy, delta);
         }
 
-        // Preset dropdown list draws on top of everything else (still inside the scaled pose).
+        // Dropdown/overlay lists draw on top of everything else (still inside the scaled pose).
         if (tab == Tab.TRIGGERS && presetDropdownOpen) {
             drawPresetList(ctx, mvx, mvy);
+        }
+        if (tab == Tab.TRIGGERS && includesDropdownOpen) {
+            drawIncludesList(ctx, mvx, mvy);
         }
 
         // Resolve the hovered tooltip (layout space).
@@ -319,6 +342,16 @@ public final class CswConfigScreen extends Screen {
 
         drawSliderRow(ctx, "Overlay opacity", x, rightX, y, cfg.overlayOpacity,
                 v -> { cfg.overlayOpacity = v; save(); }, (int) Math.round(cfg.overlayOpacity * 100) + "%");
+        y += ROW + 4;
+
+        rowLabel(ctx, "Import overwrite", x, y);
+        String confirmLabel = cfg.importConfirmMode == ImportConfirmMode.CONFIRM ? "Confirm" : "Warn only";
+        int confirmW = font.width(confirmLabel) + 14;
+        drawChip(ctx, confirmLabel, rightX - confirmW, y, confirmW, 16, mvx, mvy, "Ask before, or just warn after", () -> {
+            cfg.importConfirmMode = cfg.importConfirmMode == ImportConfirmMode.CONFIRM
+                    ? ImportConfirmMode.WARN : ImportConfirmMode.CONFIRM;
+            save();
+        });
     }
 
     private void drawTriggers(GuiGraphics ctx, int mvx, int mvy) {
@@ -331,7 +364,7 @@ public final class CswConfigScreen extends Screen {
         int ddWidth = rightX - x - 68;
         drawPresetDropdownChip(ctx, x, rowY, ddWidth, mvx, mvy);
         int bx = x + ddWidth + 4;
-        bx += drawChip(ctx, "New", bx, rowY, 32, 16, mvx, mvy, "Create a new preset", this::newPreset) + 4;
+        bx += drawChip(ctx, "New", bx, rowY, 32, 16, mvx, mvy, "Make a new preset to rename", this::newPreset) + 4;
         drawChip(ctx, "Del", bx, rowY, 28, 16, mvx, mvy, "Delete the current preset", this::deletePreset);
 
         // Row 2: name box + Rename (the box names new/renamed presets).
@@ -341,8 +374,18 @@ public final class CswConfigScreen extends Screen {
             presetField.setPosition(x, row2);
         }
         drawChip(ctx, "Rename", x + 156, row2, 56, 16, mvx, mvy, "Rename current preset to the name box", this::renamePreset);
+        drawChip(ctx, "Export", x + 216, row2, 44, 16, mvx, mvy, "Copy this preset's triggers to clipboard", this::exportPreset);
+        drawChip(ctx, "Import", x + 264, row2, 44, 16, mvx, mvy, "Replace this preset's triggers from clipboard", this::importPreset);
 
-        int addLabelY = row2 + 26;
+        // Row 3: which other (plain) presets fire alongside this one, live.
+        int row3 = row2 + 22;
+        drawIncludesChip(ctx, x, row3, 64, mvx, mvy);
+        List<String> included = cfg.presetIncludes.getOrDefault(cfg.activePreset, List.of());
+        String includesSummary = included.isEmpty() ? "None" : String.join(", ", included);
+        ctx.drawString(font, trim(includesSummary, 140), x + 70, row3 + 4,
+                included.isEmpty() ? TEXT_DIMMER : CYAN, true);
+
+        int addLabelY = row3 + 26;
         ctx.drawString(font, "TRIGGERS", x, addLabelY, TEXT_DIMMER, true);
         int addY = addLabelY + 11;
         if (addField != null) {
@@ -411,7 +454,10 @@ public final class CswConfigScreen extends Screen {
         outline(ctx, x, y, w, 16, FIELD_BORDER);
         ctx.drawString(font, trim(cfg.activePreset, w - 22), x + 6, y + 4, TEXT_WHITE, true);
         ctx.drawString(font, presetDropdownOpen ? "▲" : "▼", x + w - 12, y + 4, CYAN, true);
-        zones.add(new Zone(x, y, x + w, y + 16, () -> presetDropdownOpen = !presetDropdownOpen));
+        zones.add(new Zone(x, y, x + w, y + 16, () -> {
+            presetDropdownOpen = !presetDropdownOpen;
+            includesDropdownOpen = false;
+        }));
         tips.add(new Tip(x, y, x + w, y + 16, "Select a preset"));
     }
 
@@ -445,6 +491,68 @@ public final class CswConfigScreen extends Screen {
         rebuildWidgets();
     }
 
+    private void drawIncludesChip(GuiGraphics ctx, int x, int y, int w, int mvx, int mvy) {
+        idX = x;
+        idY = y;
+        idW = w;
+        boolean hover = inRect(mvx, mvy, x, y, w, 16);
+        ctx.fill(x, y, x + w, y + 16, hover ? CHIP_HOVER : CHIP_BG);
+        outline(ctx, x, y, w, 16, FIELD_BORDER);
+        ctx.drawString(font, "Includes", x + 6, y + 4, TEXT_WHITE, true);
+        ctx.drawString(font, includesDropdownOpen ? "▲" : "▼", x + w - 12, y + 4, CYAN, true);
+        zones.add(new Zone(x, y, x + w, y + 16, () -> {
+            includesDropdownOpen = !includesDropdownOpen;
+            presetDropdownOpen = false;
+        }));
+        tips.add(new Tip(x, y, x + w, y + 16, "Include other presets"));
+    }
+
+    /** Only presets with no includes of their own are eligible (no nesting — see CswConfig). */
+    private void drawIncludesList(GuiGraphics ctx, int mvx, int mvy) {
+        List<String> eligible = new ArrayList<>();
+        for (String name : cfg.presets.keySet()) {
+            if (!name.equals(cfg.activePreset) && cfg.presetIncludes.getOrDefault(name, List.of()).isEmpty()) {
+                eligible.add(name);
+            }
+        }
+        List<String> included = cfg.presetIncludes.getOrDefault(cfg.activePreset, List.of());
+        int x = idX;
+        int w = idW + 60;
+        int y = idY + 17;
+        if (eligible.isEmpty()) {
+            ctx.fill(x - 1, y - 1, x + w + 1, y + 19, FIELD_BORDER);
+            ctx.fill(x, y, x + w, y + 18, 0xFF0c1220);
+            ctx.drawString(font, "No presets found", x + 6, y + 5, TEXT_DIMMER, true);
+            return;
+        }
+        int h = eligible.size() * 16 + 2;
+        ctx.fill(x - 1, y - 1, x + w + 1, y + h + 1, FIELD_BORDER);
+        ctx.fill(x, y, x + w, y + h, 0xFF0c1220);
+        int ly = y + 1;
+        for (String name : eligible) {
+            boolean on = included.contains(name);
+            boolean hover = inRect(mvx, mvy, x, ly, w, 16);
+            if (hover) {
+                ctx.fill(x, ly, x + w, ly + 16, CHIP_HOVER);
+            }
+            String label = (on ? "✓ " : "  ") + trim(name, w - 20);
+            ctx.drawString(font, label, x + 6, ly + 4, on ? CYAN : (hover ? TEXT_WHITE : TEXT_DIM), true);
+            final String sel = name;
+            overlayZones.add(new Zone(x, ly, x + w, ly + 16, () -> toggleInclude(sel)));
+            ly += 16;
+        }
+    }
+
+    private void toggleInclude(String name) {
+        List<String> included = new ArrayList<>(cfg.presetIncludes.getOrDefault(cfg.activePreset, List.of()));
+        if (!included.remove(name)) {
+            included.add(name);
+        }
+        cfg.presetIncludes.put(cfg.activePreset, included);
+        save();
+        rebuildWidgets();
+    }
+
     private void drawCorpse(GuiGraphics ctx, int mvx, int mvy) {
         int x = panelX + 12;
         int rightX = panelX + panelW - 12;
@@ -458,12 +566,30 @@ public final class CswConfigScreen extends Screen {
                 });
         y += ROW;
 
+        rowLabel(ctx, "Key saved", x, y);
+        String keySavedLabel = switch (cfg.keySavedMode) {
+            case OFF -> "Off";
+            case SUPPRESS -> "Suppress loss";
+            case CELEBRATE -> "Suppress + celebrate";
+        };
+        String keySavedTip = "Click to change key-saved setting";
+        int keySavedW = font.width(keySavedLabel) + 14;
+        drawChip(ctx, keySavedLabel, rightX - keySavedW, y, keySavedW, 16, mvx, mvy, keySavedTip, () -> {
+            cfg.keySavedMode = switch (cfg.keySavedMode) {
+                case OFF -> KeySavedMode.SUPPRESS;
+                case SUPPRESS -> KeySavedMode.CELEBRATE;
+                case CELEBRATE -> KeySavedMode.OFF;
+            };
+            save();
+        });
+        y += ROW;
+
         boolean simple = cfg.corpseMode == CorpseMode.SIMPLE;
         rowLabel(ctx, "Mode", x, y);
         String modeLabel = simple ? "Set amount" : "Percentage (%)";
         String modeTip = simple
-                ? "Set amount: fires when the loss is at least the amount below."
-                : "Percentage: fires when the loss exceeds the threshold % of the key cost.";
+                ? "Fires above a fixed coin amount"
+                : "Fires above a percent of key price";
         int modeW = font.width(modeLabel) + 14;
         drawChip(ctx, modeLabel, rightX - modeW, y, modeW, 16, mvx, mvy, modeTip, () -> {
             cfg.corpseMode = cfg.corpseMode == CorpseMode.SIMPLE ? CorpseMode.PERCENTAGE : CorpseMode.SIMPLE;
@@ -527,6 +653,11 @@ public final class CswConfigScreen extends Screen {
         y = testButton(ctx, "Sim: corpse loss → loss", x, y, w, mvx, mvy,
                 () -> CswChat.onChat(Component.literal("[SkyHanni] Profit for Vanguard Corpse: -20M")),
                 "§b[CSW]§r Simulated corpse loss §7→§r §closs overlay.");
+        y = testButton(ctx, "Sim: key saved + corpse loss → suppressed", x, y, w, mvx, mvy, () -> {
+                    CswChat.onChat(Component.literal("LUCKY! Your Resourceful perk saved your key from being consumed!"));
+                    CswChat.onChat(Component.literal("[SkyHanni] Profit for Vanguard Corpse: -20M"));
+                },
+                "§b[CSW]§r Simulated key-saved corpse §7→§r loss suppressed §7(per Key saved mode)§r.");
         testButton(ctx, "Sim: no match (does nothing)", x, y, w, mvx, mvy,
                 () -> CswChat.onChat(Component.literal("hello there")),
                 "§b[CSW]§r Simulated unmatched message §7(nothing fired)§r.");
@@ -614,8 +745,9 @@ public final class CswConfigScreen extends Screen {
         int mx = toLayoutX(click.x());
         int my = toLayoutY(click.y());
 
-        // Open dropdown captures clicks first.
-        if (presetDropdownOpen) {
+        // Open dropdown/overlay captures clicks first (mutually exclusive — opening one closes
+        // the other — so at most one of these is ever true here).
+        if (presetDropdownOpen || includesDropdownOpen) {
             for (Zone z : overlayZones) {
                 if (z.hit(mx, my)) {
                     z.action().run();
@@ -623,6 +755,7 @@ public final class CswConfigScreen extends Screen {
                 }
             }
             presetDropdownOpen = false;
+            includesDropdownOpen = false;
             return true;
         }
 
@@ -646,6 +779,10 @@ public final class CswConfigScreen extends Screen {
             if (inRect(mx, my, box.getX(), box.getY(), box.getWidth(), box.getHeight())) {
                 clearBoxFocus();
                 box.setFocused(true);
+                // setFocused alone doesn't place the cursor — EditBox.onClick does that (via
+                // findClickedPositionInText). mx/my are already layout-space, same space box.getX/Y
+                // live in, so this places the cursor where the user actually clicked.
+                box.onClick(new MouseButtonEvent(mx, my, click.buttonInfo()), doubled);
                 setFocused(box);
                 return true;
             }
@@ -668,6 +805,16 @@ public final class CswConfigScreen extends Screen {
             SliderZone s = sliders.get(draggingSlider);
             s.setter().accept(s.valueAt(toLayoutX(click.x())));
             return true;
+        }
+        // Same reason as mouseClicked's onClick call: these boxes bypass the normal widget list,
+        // so nothing forwards drag events to EditBox (whose protected onDrag extends the text
+        // highlight) — route through the public mouseDragged entry point instead.
+        for (EditBox box : boxes) {
+            if (box.isFocused()) {
+                box.mouseDragged(new MouseButtonEvent(toLayoutX(click.x()), toLayoutY(click.y()), click.buttonInfo()),
+                        dragX, dragY);
+                return true;
+            }
         }
         return super.mouseDragged(click, dragX, dragY);
     }
@@ -713,15 +860,18 @@ public final class CswConfigScreen extends Screen {
         }
     }
 
+    /** Always creates a genuinely fresh preset — ignores the name box, which otherwise shows the
+     *  current preset's name and made "New" look like it silently did nothing. Switches to it and
+     *  leaves the name pre-selected in the box, ready to type over via the existing Rename flow. */
     private void newPreset() {
-        String name = presetField != null ? presetField.getValue().trim() : "";
-        if (name.isEmpty()) {
-            name = "Preset " + (cfg.presets.size() + 1);
+        String name = "New Preset";
+        int n = 2;
+        while (cfg.presets.containsKey(name)) {
+            name = "New Preset " + n++;
         }
-        if (!cfg.presets.containsKey(name)) {
-            cfg.presets.put(name, new ArrayList<>());
-        }
+        cfg.presets.put(name, new ArrayList<>());
         cfg.activePreset = name;
+        focusNewPresetField = true;
         save();
         triggerPage = 0;
         rebuildWidgets();
@@ -749,12 +899,113 @@ public final class CswConfigScreen extends Screen {
         rebuildWidgets();
     }
 
+    /** The shape actually exported/imported — own triggers plus every included preset's own
+     *  triggers, named, so Import can recreate them as separate local presets rather than just
+     *  flattening everything into one undifferentiated blob. */
+    private record PresetExport(List<String> own, Map<String, List<String>> includes) {}
+
+    /** Copies the active preset (own triggers + every included preset's triggers, named) to the
+     *  clipboard as a shareable code. */
+    private void exportPreset() {
+        Map<String, List<String>> includes = new LinkedHashMap<>();
+        for (String name : cfg.presetIncludes.getOrDefault(cfg.activePreset, List.of())) {
+            List<String> triggers = cfg.presets.get(name);
+            if (triggers != null) {
+                includes.put(name, triggers);
+            }
+        }
+        String data = Framework.config().exportJson(new PresetExport(cfg.activeTriggers(), includes));
+        Minecraft.getInstance().keyboardHandler.setClipboard(data);
+    }
+
+    /** Replaces the active preset's own triggers + includes from a code on the clipboard,
+     *  recreating any named included presets locally too. No-ops on invalid input. Overwriting an
+     *  existing preset of the same name with different content honors
+     *  {@link CswConfig#importConfirmMode}. */
+    private void importPreset() {
+        String data = Minecraft.getInstance().keyboardHandler.getClipboard();
+        PresetExport imported = Framework.config().importJson(data, PresetExport.class);
+        if (imported == null || imported.own() == null) {
+            return;
+        }
+        List<String> triggers = cfg.activeTriggers();
+        triggers.clear();
+        triggers.addAll(imported.own());
+
+        List<String> includeNames = new ArrayList<>();
+        List<String> overwritten = new ArrayList<>();
+        List<String> pendingConfirms = new ArrayList<>();
+        Map<String, List<String>> includes = imported.includes() != null ? imported.includes() : Map.of();
+        for (Map.Entry<String, List<String>> e : includes.entrySet()) {
+            String name = e.getKey();
+            List<String> newTriggers = e.getValue();
+            if (name.equals(cfg.activePreset) || newTriggers == null) {
+                continue; // no self-include; skip malformed entries
+            }
+            includeNames.add(name);
+            List<String> existing = cfg.presets.get(name);
+            if (existing == null || existing.equals(newTriggers)) {
+                cfg.presets.put(name, newTriggers); // new, or already identical — just write it
+                continue;
+            }
+            // Collision: an existing preset by that name has different content.
+            if (cfg.importConfirmMode == ImportConfirmMode.WARN) {
+                cfg.presets.put(name, newTriggers);
+                overwritten.add(name);
+            } else {
+                PendingPresetImports.stage(name, newTriggers);
+                pendingConfirms.add(name);
+            }
+        }
+        cfg.presetIncludes.put(cfg.activePreset, includeNames);
+        save();
+
+        if (!pendingConfirms.isEmpty()) {
+            // Close so the collision prompts (posted right after) are what the user actually
+            // sees — staying open with an "Imported" line elsewhere would read as already done
+            // while a [Yes] click is still outstanding.
+            onClose();
+            for (String name : pendingConfirms) {
+                postConfirmPrompt(name);
+            }
+            return;
+        }
+
+        // Always confirm the click did something — silence reads as broken even when there was
+        // nothing to overwrite (e.g. re-importing content that's already identical).
+        if (minecraft != null && minecraft.player != null) {
+            String text = overwritten.isEmpty()
+                    ? "Imported into §a" + cfg.activePreset + "§r."
+                    : "Imported — overwrote existing presets: " + String.join(", ", overwritten) + ".";
+            minecraft.player.displayClientMessage(Component.literal("§b[CSW]§r " + text), false);
+        }
+        triggerPage = 0;
+        rebuildWidgets();
+    }
+
+    /** Posts a clickable "overwrite?" prompt for a staged {@link PendingPresetImports} entry. */
+    private void postConfirmPrompt(String name) {
+        if (minecraft == null || minecraft.player == null) {
+            return;
+        }
+        Component yes = Component.literal("[Yes]").withStyle(Style.EMPTY
+                .withColor(ChatFormatting.GREEN)
+                .withClickEvent(new ClickEvent.RunCommand("/csw confirmimport " + name)));
+        Component msg = Component.literal("§b[CSW]§r §e" + name + "§r already exists with different triggers — overwrite? ")
+                .append(yes)
+                .append(Component.literal(" §7(5s)§r"));
+        minecraft.player.displayClientMessage(msg, false);
+    }
+
     private void deletePreset() {
         if (cfg.presets.size() <= 1) {
             return;
         }
         cfg.presets.remove(cfg.activePreset);
         cfg.activePreset = cfg.presets.keySet().iterator().next();
+        // Strips any dangling include-references to the just-deleted preset (validate() normally
+        // only runs on load — a live delete needs the same cleanup immediately, not on next restart).
+        cfg.validate();
         save();
         triggerPage = 0;
         rebuildWidgets();
